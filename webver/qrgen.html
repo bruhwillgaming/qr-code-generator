@@ -92,13 +92,6 @@
     </style>
 
     <script language="vbscript">
-        Function GetWinVer()
-            On Error Resume Next
-            Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
-            Set colOS = objWMIService.ExecQuery("Select * from Win32_OperatingSystem")
-            For Each objOS in colOS : GetWinVer = objOS.Caption : Next
-        End Function
-
         Function GetUser()
             On Error Resume Next
             Set network = CreateObject("WScript.Network")
@@ -157,11 +150,7 @@
         var qrObj = null;
 
         function StartBoot() {
-            
-            if (v.indexOf("10") == -1 && v.indexOf("11") == -1) {
-                document.getElementById("loader").style.display = "none";
-            }
-
+            document.getElementById("loader").style.display = "block";
             var u = "User";
             try { u = window.GetUser(); } catch(e) {}
 
