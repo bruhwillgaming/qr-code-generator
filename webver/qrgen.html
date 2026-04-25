@@ -157,13 +157,9 @@
         var qrObj = null;
 
         function StartBoot() {
-            var v = "";
-            try { v = window.GetWinVer(); } catch(e) { v = "Unknown"; }
             
             if (v.indexOf("10") == -1 && v.indexOf("11") == -1) {
                 document.getElementById("loader").style.display = "none";
-                document.getElementById("errorMsg").innerHTML = "Sorry, but you are on " + v + " which is not supported.<br>Upgrade to Windows 10 or 11.";
-                return;
             }
 
             var u = "User";
