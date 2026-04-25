@@ -1,0 +1,217 @@
+<html>
+<head>
+    <title>QR Code Gen Professional</title>
+    <hta:application id="oQR" border="thin" scroll="no" maximizebutton="no" singleinstance="yes" width="480" height="820" />
+    
+    <style>
+        body { background: #000; color: #FFF; font-family: "Tahoma", sans-serif; text-align: center; margin: 0; padding: 0; overflow: hidden; }
+        #profileOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 500; display: block; padding-top: 50px; overflow-y: auto; }
+        .profile-card { display: inline-block; width: 110px; margin: 15px; cursor: hand; vertical-align: top; }
+        .profile-img { width: 85px; height: 85px; border: 2px solid #333; border-radius: 4px; background: #222; margin-bottom: 8px; }
+        .profile-card:hover .profile-img { border-color: #0078D7; }
+        #userIcon { position: absolute; top: 10px; right: 10px; width: 45px; height: 45px; border: 2px solid #555; cursor: hand; background: #222; z-index: 400; }
+        #userDropdown { position: absolute; top: 60px; right: 10px; width: 150px; background: #1c1c1c; border: 1px solid #555; display: none; z-index: 450; text-align: left; }
+        .menu-item { padding: 10px; font-size: 11px; cursor: hand; border-bottom: 1px solid #333; }
+        .menu-item:hover { background: #0078D7; }
+        .wrapper { width: 420px; margin: 0 auto; padding-top: 40px; }
+        .card { background: #1c1c1c; border: 1px solid #333; padding: 20px; border-radius: 8px; }
+        input { background: #111; color: #0F0; border: 1px solid #555; width: 100%; padding: 12px; font-family: "Courier New"; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+        #qrImage { border: 8px solid #FFF; background: #FFF; margin: 10px 0; width: 230px; height: 230px; }
+        .btn { background: #0078D7; color: #FFF; border: 1px solid #FFF; padding: 12px; cursor: hand; width: 100%; font-weight: bold; margin-top: 10px; }
+        #fileMenu { display: none; margin-top: 15px; padding: 10px; background: #222; border: 1px dashed #555; }
+        .file-link { display: inline-block; width: 28%; background: #444; border: 1px solid #555; padding: 8px; margin: 4px; font-size: 10px; cursor: hand; font-weight: bold; }
+        .status { color: #0F0; font-size: 12px; margin-top: 10px; height: 20px; font-weight: bold; }
+    </style>
+
+    <script language="vbscript">
+        Dim shell, fso, appData, activeUser, activeFile, consoleWin
+        Set shell = CreateObject("WScript.Shell")
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        appData = shell.ExpandEnvironmentStrings("%APPDATA%") & "\QRGenPro"
+        Const USR_IMG = "C:\Documents and Settings\All Users\Application Data\Microsoft\User Account Pictures\Guest.bmp"
+
+        Sub Window_OnLoad()
+            If Not fso.FolderExists(appData) Then 
+                fso.CreateFolder appData
+            End If
+            LoadProfiles
+        End Sub
+
+        Sub LogIt(msg)
+            On Error Resume Next
+            If IsObject(consoleWin) Then
+                Dim d : d = Now
+                consoleWin.document.getElementById("logBody").innerHTML = consoleWin.document.getElementById("logBody").innerHTML & "[" & d & "] " & msg & "<br>"
+                consoleWin.scrollTo 0, 100000
+            End If
+        End Sub
+
+        Function GenRand(length)
+            Dim chars, i, res
+            chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            Randomize
+            res = ""
+            For i = 1 To length 
+                res = res & Mid(chars, Int((Len(chars) * Rnd) + 1), 1) 
+            Next
+            GenRand = res
+        End Function
+
+        Sub LoadProfiles()
+            On Error Resume Next
+            Dim html, folder, file, content, uName
+            html = "<h2 style='color:#0078D7'>Whos using QR Code Gen?</h2><div id='pList'>"
+            Set folder = fso.GetFolder(appData)
+            For Each file In folder.Files
+                If LCase(fso.GetExtensionName(file.Name)) = "dat" Then
+                    content = fso.OpenTextFile(file.Path, 1).ReadLine
+                    If InStr(content, "username:") > 0 Then
+                        uName = Mid(content, InStr(content, "username:") + 9)
+                        uName = Left(uName, InStr(uName, " cache:") - 1)
+                        ' Use single quotes for JS and double-double quotes for VBS pathing
+                        html = html & "<div class='profile-card' onclick=""SelectProfile '" & uName & "', '" & Replace(file.Path, "\", "\\") & "'"">" & _
+                               "<img class='profile-img' src='" & USR_IMG & "'><div>" & uName & "</div></div>"
+                    End If
+                End If
+            Next
+            html = html & "</div><br><button class='btn' style='width:220px' onclick='CreateUser'>Add New Account</button>"
+            Document.GetElementById("profileOverlay").InnerHtml = html
+        End Sub
+
+        Sub CreateUser()
+            Dim n : n = InputBox("Enter Username:", "New Profile")
+            If n <> "" Then
+                Dim fName : fName = GenRand(8) & ".dat"
+                Dim cacheStr : cacheStr = GenRand(24)
+                Dim f : Set f = fso.CreateTextFile(appData & "\" & fName, True)
+                f.WriteLine "username:" & n & " cache:" & cacheStr
+                f.Close
+                LogIt "Created profile: " & n & " (ID: " & fName & ")"
+                LoadProfiles
+            End If
+        End Sub
+
+        Sub SelectProfile(uName, fPath)
+            activeUser = uName
+            activeFile = fPath
+            Document.GetElementById("profileOverlay").Style.Display = "none"
+            Document.GetElementById("curUserDisplay").InnerHtml = uName
+            
+            If LCase(uName) = "test123" Then
+                OpenConsole
+            End If
+            
+            LogIt "Logged in as: " & uName
+            UpdateQR
+        End Sub
+
+        Sub OpenConsole()
+            Set consoleWin = window.open("about:blank", "console", "width=500,height=400,scrollbars=yes")
+            consoleWin.document.write "<html><head><title>Console</title><style>body{background:#111;color:#0F0;font-family:monospace;font-size:11px;margin:10px;}</style></head><body>" & _
+            "<div style='border-bottom:1px solid #333;padding-bottom:5px;margin-bottom:10px;font-weight:bold;'>HTA SYSTEM LOGS</div><div id='logBody'></div></body></html>"
+        End Sub
+
+        Sub UpdateQR()
+            Dim txt : txt = Document.GetElementById("linkInput").Value
+            Document.GetElementById("qrImage").Src = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" & txt
+            LogIt "QR Updated: " & Left(txt, 20) & "..."
+        End Sub
+
+        Sub QuickSave(ext)
+            On Error Resume Next
+            Document.GetElementById("statusMsg").InnerHtml = "Saving..."
+            Dim url, fName, xml, stream
+            url = Document.GetElementById("qrImage").Src
+            fName = shell.SpecialFolders("Desktop") & "\QR_" & activeUser & "_" & GenRand(4) & "." & ext
+            
+            LogIt "Requesting download: " & ext
+            Set xml = CreateObject("MSXML2.XMLHTTP")
+            xml.Open "GET", url, False : xml.Send
+            
+            If xml.Status = 200 Then
+                Set stream = CreateObject("ADODB.Stream")
+                stream.Open 
+                stream.Type = 1 
+                stream.Write xml.responseBody
+                stream.SaveToFile fName, 2 
+                stream.Close
+                LogIt "File successfully saved to Desktop."
+                Document.GetElementById("statusMsg").InnerHtml = "SUCCESS: saved to Desktop!"
+            Else
+                LogIt "ERROR: Download failed with status " & xml.Status
+            End If
+            Window.SetTimeout "ClearStatus", 3000
+        End Sub
+
+        Sub ClearStatus() 
+            Document.GetElementById("statusMsg").InnerHtml = "" 
+        End Sub
+
+        Sub ToggleUserMenu() 
+            Dim m : Set m = Document.GetElementById("userDropdown") 
+            If m.Style.Display = "block" Then 
+                m.Style.Display = "none" 
+            Else 
+                m.Style.Display = "block" 
+            End If 
+        End Sub
+
+        Sub ToggleFormats() 
+            Dim m : Set m = Document.GetElementById("fileMenu") 
+            If m.Style.Display = "block" Then 
+                m.Style.Display = "none" 
+            Else 
+                m.Style.Display = "block" 
+            End If 
+        End Sub
+
+        Sub SwitchProfiles() 
+            Document.GetElementById("userDropdown").Style.Display = "none" 
+            Document.GetElementById("profileOverlay").Style.Display = "block" 
+            LoadProfiles 
+        End Sub
+
+        Sub DeleteProfile() 
+            If MsgBox("Delete this profile?", 36, "Confirm") = 6 Then 
+                fso.DeleteFile activeFile 
+                SwitchProfiles 
+            End If 
+        End Sub
+    </script>
+</head>
+
+<body>
+    <div id="profileOverlay"></div>
+
+    <img id="userIcon" src="C:\Documents and Settings\All Users\Application Data\Microsoft\User Account Pictures\Guest.bmp" onclick="ToggleUserMenu">
+    <div id="userDropdown">
+        <div class="menu-item" style="font-weight:bold; color:#0F0; border-bottom:1px solid #555;" id="curUserDisplay">User</div>
+        <div class="menu-item" onclick="SwitchProfiles">Switch Profile</div>
+        <div class="menu-item" onclick="DeleteProfile">Delete Profile</div>
+        <div class="menu-item" onclick="Window.Close">Exit</div>
+        <div class="menu-item" onclick="ToggleUserMenu">Close</div>
+    </div>
+
+    <div class="wrapper">
+        <div class="card">
+            <h2 style="margin:0 0 15px 0; color:#0078D7;">QR Code Gen Professional</h2>
+            <input type="text" id="linkInput" value="https://google.com" onkeyup="UpdateQR">
+            <div style="background:#FFF; padding:5px; display:inline-block; border-radius:4px;"><img id="qrImage" src="" /></div>
+            <button class="btn" onclick="QuickSave 'png'">QUICK DOWNLOAD (.PNG)</button>
+            <button class="btn" style="background:#333; font-size:11px;" onclick="ToggleFormats">VIEW ALL FILE OPTIONS</button>
+            <div id="statusMsg" class="status"></div>
+        </div>
+
+        <div id="fileMenu">
+            <div class="file-link" onclick="QuickSave 'jpg'">.JPG</div>
+            <div class="file-link" onclick="QuickSave 'ico'">.ICO</div>
+            <div class="file-link" onclick="QuickSave 'bmp'">.BMP</div>
+            <div class="file-link" onclick="QuickSave 'gif'">.GIF</div>
+            <div class="file-link" onclick="QuickSave 'pdf'">.PDF</div>
+            <div class="file-link" onclick="QuickSave 'tiff'">.TIFF</div>
+            <div class="file-link" onclick="QuickSave 'webp'">.WEBP</div>
+            <div class="file-link" onclick="QuickSave 'svg'">.SVG</div>
+        </div>
+    </div>
+</body>
+</html>
